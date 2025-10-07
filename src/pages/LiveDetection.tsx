@@ -57,22 +57,17 @@ const LiveDetection = () => {
   };
 
   const toggleDetection = () => {
-    if (isDetecting) {
-      setIsDetecting(false);
-    } else {
-      setIsDetecting(true);
-      runDetection();
-    }
+    setIsDetecting(!isDetecting);
   };
 
-  const runDetection = () => {
+  useEffect(() => {
+    if (!isDetecting) {
+      setDetections([]);
+      return;
+    }
+
     // Simulate continuous detection - replace with actual Roboflow API calls
     const interval = setInterval(() => {
-      if (!isDetecting) {
-        clearInterval(interval);
-        return;
-      }
-
       // Mock detections
       const mockDetections: Detection[] = [
         { class: "Person", confidence: 0.89 + Math.random() * 0.1 },
@@ -82,7 +77,9 @@ const LiveDetection = () => {
       setDetections(mockDetections);
       setFps(Math.floor(15 + Math.random() * 10));
     }, 500);
-  };
+
+    return () => clearInterval(interval);
+  }, [isDetecting]);
 
   useEffect(() => {
     return () => {
