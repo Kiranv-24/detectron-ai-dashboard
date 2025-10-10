@@ -5,6 +5,7 @@ import { Upload, Loader2, Image as ImageIcon, X } from "lucide-react";
 import Navbar from "@/components/Navbar";
 import DetectionResults from "@/components/DetectionResults";
 import { useToast } from "@/hooks/use-toast";
+import { ApiService } from "@/services/api";
 
 interface Detection {
   class: string;
@@ -39,50 +40,103 @@ const UploadDetection = () => {
     if (!selectedImage) return;
 
     setIsProcessing(true);
-    
-    // Simulate API call - replace with actual Roboflow API call
-    setTimeout(() => {
-      // Mock detections
-      const mockDetections: Detection[] = [
-        { class: "Person", confidence: 0.92, x: 100, y: 100, width: 150, height: 200 },
-        { class: "Car", confidence: 0.85, x: 300, y: 200, width: 180, height: 120 },
-        { class: "Bicycle", confidence: 0.78, x: 500, y: 150, width: 100, height: 120 },
-      ];
-      
-      setDetections(mockDetections);
-      drawBoundingBoxes(mockDetections);
-      setIsProcessing(false);
-      
+
+    try {
+      // Convert data URL to File
+      const response = await fetch(selectedImage);
+      const blob = await response.blob();
+      const file = new File([blob], "image.jpg", { type: "image/jpeg" });
+
+      // Call real API
+      const result = await ApiService.detectImage(file);
+
+      setDetections(result.detections);
+      drawBoundingBoxes(result.detections);
+
       toast({
         title: "Detection Complete",
-        description: `Found ${mockDetections.length} objects`,
+        description: `Found ${result.detections.length} objects`,
       });
-    }, 2000);
+    } catch (error) {
+      console.error("Detection error:", error);
+
+      // Fallback to mock data if API fails
+      const mockDetections: Detection[] = [
+        {
+          class: "person",
+          confidence: 0.72,
+          x: 100,
+          y: 100,
+          width: 150,
+          height: 200,
+        },
+        {
+          class: "helmet",
+          confidence: 0.88,
+          x: 120,
+          y: 80,
+          width: 80,
+          height: 60,
+        },
+        {
+          class: "no-jacket",
+          confidence: 0.84,
+          x: 110,
+          y: 140,
+          width: 120,
+          height: 100,
+        },
+        {
+          class: "safety belt",
+          confidence: 0.5,
+          x: 130,
+          y: 180,
+          width: 80,
+          height: 40,
+        },
+      ];
+
+      setDetections(mockDetections);
+      drawBoundingBoxes(mockDetections);
+
+      toast({
+        title: "Detection Complete (Mock Data)",
+        description: `Found ${mockDetections.length} objects - Using fallback data`,
+        variant: "destructive",
+      });
+    } finally {
+      setIsProcessing(false);
+    }
   };
 
   const drawBoundingBoxes = (detections: Detection[]) => {
     const canvas = canvasRef.current;
     const img = new Image();
     img.src = selectedImage!;
-    
+
     img.onload = () => {
       if (canvas) {
         canvas.width = img.width;
         canvas.height = img.height;
         const ctx = canvas.getContext("2d");
-        
+
         if (ctx) {
           ctx.drawImage(img, 0, 0);
-          
+
           detections.forEach((detection, index) => {
             const colors = ["#a855f7", "#3b82f6", "#06b6d4"];
             ctx.strokeStyle = colors[index % colors.length];
             ctx.lineWidth = 3;
-            ctx.strokeRect(detection.x, detection.y, detection.width, detection.height);
-            
+            ctx.strokeRect(
+              detection.x,
+              detection.y,
+              detection.width,
+              detection.height
+            );
+
             ctx.fillStyle = colors[index % colors.length];
             ctx.fillRect(detection.x, detection.y - 25, detection.width, 25);
-            
+
             ctx.fillStyle = "white";
             ctx.font = "16px sans-serif";
             ctx.fillText(
@@ -107,14 +161,18 @@ const UploadDetection = () => {
   return (
     <div className="min-h-screen bg-background">
       <Navbar />
-      
+
       <div className="container mx-auto px-4 pt-24 pb-12">
         <div className="max-w-4xl mx-auto space-y-6">
           <div className="text-center space-y-2 mb-8 animate-fade-in">
-            <h1 className="text-4xl font-bold text-foreground">Image Detection</h1>
-            <p className="text-muted-foreground">Upload an image to detect objects</p>
+            <h1 className="text-4xl font-bold text-foreground">
+              Image Detection
+            </h1>
+            <p className="text-muted-foreground">
+              Upload an image to detect objects
+            </p>
           </div>
-          
+
           <Card className="p-8 bg-card/50 backdrop-blur-sm border-border">
             {!selectedImage ? (
               <div className="space-y-4">
@@ -136,7 +194,7 @@ const UploadDetection = () => {
                     </div>
                   </div>
                 </div>
-                
+
                 <input
                   ref={fileInputRef}
                   type="file"
@@ -151,7 +209,9 @@ const UploadDetection = () => {
                   <canvas
                     ref={canvasRef}
                     className="w-full rounded-lg border border-border"
-                    style={{ display: detections.length > 0 ? "block" : "none" }}
+                    style={{
+                      display: detections.length > 0 ? "block" : "none",
+                    }}
                   />
                   {detections.length === 0 && (
                     <img
@@ -169,7 +229,7 @@ const UploadDetection = () => {
                     <X className="w-4 h-4" />
                   </Button>
                 </div>
-                
+
                 <Button
                   variant="hero"
                   size="lg"
@@ -192,8 +252,10 @@ const UploadDetection = () => {
               </div>
             )}
           </Card>
-          
-          {detections.length > 0 && <DetectionResults detections={detections} />}
+
+          {detections.length > 0 && (
+            <DetectionResults detections={detections} />
+          )}
         </div>
       </div>
     </div>

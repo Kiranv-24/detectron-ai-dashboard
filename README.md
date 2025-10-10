@@ -1,73 +1,273 @@
-# Welcome to your Lovable project
+# Detectron AI Dashboard
 
-## Project info
+A modern, real-time AI object detection dashboard powered by Roboflow 3.0 with WebSocket support for live detection.
 
-**URL**: https://lovable.dev/projects/d327da25-1937-429c-b38c-08424eeb7fd8
+## Features
 
-## How can I edit this code?
+- 🎥 **Live Camera Detection** - Real-time object detection using your webcam
+- 📸 **Image Upload Detection** - Upload images for instant analysis
+- 🔄 **WebSocket Integration** - Low-latency real-time communication
+- 🤖 **Roboflow API Integration** - Powered by state-of-the-art AI models
+- 📊 **Real-time Statistics** - Live FPS, processing time, and detection metrics
+- 🎨 **Modern UI** - Beautiful, responsive interface with dark/light themes
+- ⚡ **Performance Optimized** - Efficient image processing and frame capture
 
-There are several ways of editing your application.
+## Tech Stack
 
-**Use Lovable**
+### Frontend
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/d327da25-1937-429c-b38c-08424eeb7fd8) and start prompting.
+- **React 18** with TypeScript
+- **Vite** for fast development and building
+- **Tailwind CSS** for styling
+- **Shadcn/ui** for UI components
+- **Socket.io Client** for WebSocket communication
+- **Lucide React** for icons
 
-Changes made via Lovable will be committed automatically to this repo.
+### Backend
 
-**Use your preferred IDE**
+- **Node.js** with Express
+- **Socket.io** for WebSocket server
+- **Sharp** for image processing
+- **Multer** for file uploads
+- **Helmet** for security
+- **Rate Limiting** for API protection
 
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
+## Quick Start
 
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
+### Prerequisites
 
-Follow these steps:
+- Node.js 18+
+- npm or yarn
+- A Roboflow API key (optional - mock data available)
 
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
+### 1. Clone and Setup
 
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
+```bash
+# Clone the repository
+git clone <your-repo-url>
+cd detectron-ai-dashboard
 
-# Step 3: Install the necessary dependencies.
-npm i
+# Install frontend dependencies
+npm install
 
-# Step 4: Start the development server with auto-reloading and an instant preview.
+# Install backend dependencies
+cd server
+npm install
+cd ..
+```
+
+### 2. Configure Environment
+
+Copy the example environment file and configure your Roboflow API key:
+
+```bash
+# Copy environment file
+cp server/env.example server/.env
+
+# Edit the .env file
+nano server/.env
+```
+
+Update the following variables in `server/.env`:
+
+```env
+# Roboflow API Configuration
+ROBOFLOW_API_KEY=YOUR_ROBOFLOW_API_KEY_HERE
+ROBOFLOW_MODEL_URL=internship-9cig4/1
+ROBOFLOW_CHECKPOINT=idpr-rh5oc/2
+
+# Server Configuration
+PORT=3001
+NODE_ENV=development
+CORS_ORIGIN=http://localhost:8080
+```
+
+### 3. Start the Application
+
+Open two terminal windows:
+
+**Terminal 1 - Backend Server:**
+
+```bash
+cd server
 npm run dev
 ```
 
-**Edit a file directly in GitHub**
+**Terminal 2 - Frontend Development:**
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+```bash
+npm run dev
+```
 
-**Use GitHub Codespaces**
+### 4. Access the Application
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+- **Frontend**: http://localhost:8080
+- **Backend API**: http://localhost:3001
+- **Health Check**: http://localhost:3001/health
 
-## What technologies are used for this project?
+## API Configuration
 
-This project is built with:
+### Getting Your Roboflow API Key
 
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
+1. Go to [Roboflow](https://roboflow.com)
+2. Create an account or sign in
+3. Navigate to your workspace
+4. Go to Settings > API Keys
+5. Copy your API key
+6. Paste it in the `ROBOFLOW_API_KEY` field in your `.env` file
 
-## How can I deploy this project?
+### Model Configuration
 
-Simply open [Lovable](https://lovable.dev/projects/d327da25-1937-429c-b38c-08424eeb7fd8) and click on Share -> Publish.
+The application is configured to use:
 
-## Can I connect a custom domain to my Lovable project?
+- **Model URL**: `internship-snt8r/1`
+- **Checkpoint**: None (RF-DETR Nano model)
 
-Yes, you can!
+You can modify these in the `.env` file or update the `ModelInfo.tsx` component.
 
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
+## Usage
 
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/custom-domain#custom-domain)
+### Live Detection
+
+1. Click "Start Camera" to access your webcam
+2. Allow camera permissions when prompted
+3. Click "Start Detection" to begin real-time object detection
+4. View live statistics and detection results
+
+### Image Upload Detection
+
+1. Click "Upload Image" or drag and drop an image
+2. Click "Detect Objects" to analyze the image
+3. View bounding boxes and detection results
+
+## Development
+
+### Project Structure
+
+```
+detectron-ai-dashboard/
+├── src/                    # Frontend React app
+│   ├── components/         # Reusable UI components
+│   ├── hooks/             # Custom React hooks
+│   ├── pages/             # Page components
+│   ├── services/          # API services
+│   └── lib/               # Utility functions
+├── server/                # Backend Node.js server
+│   ├── services/          # Business logic services
+│   ├── server.js          # Main server file
+│   └── package.json       # Backend dependencies
+└── public/                # Static assets
+```
+
+### Available Scripts
+
+**Frontend:**
+
+```bash
+npm run dev          # Start development server
+npm run build        # Build for production
+npm run preview      # Preview production build
+npm run lint         # Run ESLint
+```
+
+**Backend:**
+
+```bash
+npm run dev          # Start with nodemon (development)
+npm start            # Start production server
+npm test             # Run tests
+```
+
+### Environment Variables
+
+| Variable              | Description           | Default                 |
+| --------------------- | --------------------- | ----------------------- |
+| `ROBOFLOW_API_KEY`    | Your Roboflow API key | Required                |
+| `ROBOFLOW_MODEL_URL`  | Roboflow model URL    | `internship-9cig4/1`    |
+| `ROBOFLOW_CHECKPOINT` | Model checkpoint      | `idpr-rh5oc/2`          |
+| `PORT`                | Server port           | `3001`                  |
+| `NODE_ENV`            | Environment           | `development`           |
+| `CORS_ORIGIN`         | Allowed CORS origins  | `http://localhost:8080` |
+
+## Features in Detail
+
+### Real-time WebSocket Communication
+
+- Low-latency frame processing
+- Automatic reconnection handling
+- Connection status indicators
+- Performance metrics
+
+### Image Processing
+
+- Automatic image resizing for optimal detection
+- Multiple format support (JPEG, PNG, WebP)
+- Batch processing capabilities
+- Thumbnail generation
+
+### Security Features
+
+- Rate limiting on API endpoints
+- CORS protection
+- Helmet security headers
+- Input validation
+
+### Performance Optimizations
+
+- Frame rate throttling
+- Image compression
+- Efficient WebSocket message handling
+- Memory management
+
+## Troubleshooting
+
+### Common Issues
+
+**Camera not working:**
+
+- Ensure you're using HTTPS or localhost
+- Check browser permissions
+- Verify camera is not in use by another application
+
+**WebSocket connection failed:**
+
+- Ensure backend server is running on port 3001
+- Check CORS configuration
+- Verify firewall settings
+
+**API key issues:**
+
+- Verify your Roboflow API key is correct
+- Check if the model URL and checkpoint are valid
+- Ensure you have sufficient API credits
+
+**Performance issues:**
+
+- Reduce FPS in detection settings
+- Lower image resolution
+- Check server resources
+
+### Debug Mode
+
+Enable debug logging by setting `NODE_ENV=development` in your `.env` file.
+
+## Contributing
+
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes
+4. Add tests if applicable
+5. Submit a pull request
+
+## License
+
+MIT License - see LICENSE file for details.
+
+## Support
+
+For issues and questions:
+
+- Check the troubleshooting section
+- Review the console logs for errors
+- Ensure all dependencies are installed correctly
+- Verify environment configuration
