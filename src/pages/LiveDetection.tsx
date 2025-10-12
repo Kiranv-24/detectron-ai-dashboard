@@ -60,8 +60,8 @@ const LiveDetection = () => {
       console.log("📱 Requesting camera access...");
       const stream = await navigator.mediaDevices.getUserMedia({
         video: {
-          width: { ideal: 640 },
-          height: { ideal: 480 },
+          width: { ideal: 1280, min: 640 },
+          height: { ideal: 720, min: 480 },
           facingMode: "user",
         },
         audio: false,
@@ -172,7 +172,8 @@ const LiveDetection = () => {
   // Function to draw bounding boxes on video
   const drawBoundingBoxes = (
     detections: any[],
-    videoElement: HTMLVideoElement
+    videoElement: HTMLVideoElement,
+    imageInfo?: { width: number; height: number }
   ) => {
     const canvas = canvasRef.current;
     if (!canvas || !videoElement) return;
@@ -187,42 +188,76 @@ const LiveDetection = () => {
     // Clear previous drawings
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
+    // Calculate scaling factors if image was resized on server
+    let scaleX = 1;
+    let scaleY = 1;
+
+    if (imageInfo && imageInfo.width && imageInfo.height) {
+      scaleX = videoElement.videoWidth / imageInfo.width;
+      scaleY = videoElement.videoHeight / imageInfo.height;
+    }
+
     // Draw bounding boxes
     detections.forEach((detection, index) => {
       const { x, y, width, height, class: className, confidence } = detection;
 
-      // Calculate actual positions on canvas
-      const canvasX = x - width / 2;
-      const canvasY = y - height / 2;
-      const canvasWidth = width;
-      const canvasHeight = height;
+      // Scale coordinates from processed image back to video dimensions
+      const scaledX = x * scaleX;
+      const scaledY = y * scaleY;
+      const scaledWidth = width * scaleX;
+      const scaledHeight = height * scaleY;
 
-      // Choose color based on class
+      // Roboflow API returns center coordinates, convert to top-left
+      const canvasX = scaledX - scaledWidth / 2;
+      const canvasY = scaledY - scaledHeight / 2;
+      const canvasWidth = scaledWidth;
+      const canvasHeight = scaledHeight;
+
+      // Choose color based on class with better contrast
       const colors = [
-        "#3b82f6",
-        "#ef4444",
-        "#10b981",
-        "#f59e0b",
-        "#8b5cf6",
-        "#06b6d4",
+        "#00ff00", // Bright green for person
+        "#ff6b35", // Orange for helmet violations
+        "#ff1744", // Red for mask violations
+        "#ffd700", // Gold for jacket violations
+        "#00bcd4", // Cyan for other safety items
+        "#9c27b0", // Purple for additional items
       ];
       const color = colors[index % colors.length];
 
-      // Draw bounding box
+      // Draw bounding box with thicker line for better visibility
       ctx.strokeStyle = color;
-      ctx.lineWidth = 3;
+      ctx.lineWidth = 4;
       ctx.strokeRect(canvasX, canvasY, canvasWidth, canvasHeight);
 
-      // Draw label background
+      // Draw label background with better padding
       const label = `${className} ${(confidence * 100).toFixed(0)}%`;
-      ctx.font = "16px Arial";
+      ctx.font = "bold 18px 'Segoe UI', Arial, sans-serif";
       ctx.fillStyle = color;
-      const textWidth = ctx.measureText(label).width;
-      ctx.fillRect(canvasX, canvasY - 25, textWidth + 10, 25);
+      const textMetrics = ctx.measureText(label);
+      const textWidth = textMetrics.width;
+      const textHeight = 28; // Increased height for better readability
 
-      // Draw label text
+      // Draw rounded background
+      const padding = 8;
+      const bgX = canvasX;
+      const bgY = canvasY - textHeight - padding;
+      const bgWidth = textWidth + padding * 2;
+      const bgHeight = textHeight;
+
+      // Draw background rectangle with rounded corners
+      ctx.fillStyle = color;
+      ctx.fillRect(bgX, bgY, bgWidth, bgHeight);
+
+      // Add subtle border for better contrast
+      ctx.strokeStyle = "rgba(255, 255, 255, 0.3)";
+      ctx.lineWidth = 1;
+      ctx.strokeRect(bgX, bgY, bgWidth, bgHeight);
+
+      // Draw label text with better contrast and positioning
       ctx.fillStyle = "white";
-      ctx.fillText(label, canvasX + 5, canvasY - 8);
+      ctx.font = "bold 18px 'Segoe UI', Arial, sans-serif";
+      ctx.textBaseline = "middle";
+      ctx.fillText(label, bgX + padding, bgY + textHeight / 2);
     });
   };
 
@@ -251,7 +286,11 @@ const LiveDetection = () => {
       lastDetection.detections.length > 0 &&
       videoRef.current
     ) {
-      drawBoundingBoxes(lastDetection.detections, videoRef.current);
+      drawBoundingBoxes(
+        lastDetection.detections,
+        videoRef.current,
+        lastDetection.imageInfo
+      );
     }
   }, [lastDetection]);
 
@@ -266,7 +305,7 @@ const LiveDetection = () => {
       <Navbar />
 
       <div className="container mx-auto px-4 pt-24 pb-12">
-        <div className="max-w-4xl mx-auto space-y-6">
+        <div className="max-w-7xl mx-auto space-y-6">
           <div className="text-center space-y-2 mb-8 animate-fade-in">
             <h1 className="text-4xl font-bold text-foreground">
               Live Detection
@@ -300,9 +339,9 @@ const LiveDetection = () => {
             </div>
           </div>
 
-          <Card className="p-8 bg-card/50 backdrop-blur-sm border-border">
+          <Card className="p-6 bg-card/50 backdrop-blur-sm border-border">
             <div className="space-y-4">
-              <div className="relative aspect-video bg-muted/20 rounded-lg overflow-hidden border border-border">
+              <div className="relative aspect-[16/9] bg-muted/20 rounded-lg overflow-hidden border border-border min-h-[500px]">
                 {/* Always render video element, but hide it when not streaming */}
                 <video
                   ref={videoRef}
