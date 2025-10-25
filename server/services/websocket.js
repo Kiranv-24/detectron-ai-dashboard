@@ -1,11 +1,13 @@
 import { RoboflowService } from "./roboflow.js";
 import { ImageProcessor } from "./imageProcessor.js";
+import { PPETracker } from "./ppeTracker.js";
 
 export class WebSocketHandler {
   constructor(io, roboflowService, imageProcessor) {
     this.io = io;
     this.roboflowService = roboflowService;
     this.imageProcessor = imageProcessor;
+    this.ppeTracker = new PPETracker();
     this.activeSessions = new Map();
     this.frameProcessingQueue = new Map();
     this.maxConcurrentProcessing = 3;
@@ -41,6 +43,9 @@ export class WebSocketHandler {
           avgProcessingTime: 0,
         },
       });
+
+      // Register session with PPE tracker
+      this.ppeTracker.registerSession(sessionId);
 
       // Send acknowledgment
       socket.emit("detection_started", {
@@ -146,7 +151,14 @@ export class WebSocketHandler {
         )
         .slice(0, session.config.maxDetections);
 
-      // Send results to client
+      // Process PPE violations
+      const violationCheck = this.ppeTracker.processDetection(
+        frameData.sessionId,
+        filteredDetections,
+        imageBuffer
+      );
+
+      // Send results to client with PPE violation info
       socket.emit("detection_result", {
         frameId: frameData.id,
         detections: filteredDetections,
@@ -162,6 +174,9 @@ export class WebSocketHandler {
           avgProcessingTime: session.stats.avgProcessingTime,
           totalFrames: session.stats.totalFrames,
         },
+        ppeViolations: violationCheck.violations,
+        hasViolations: violationCheck.hasViolations,
+        isAllProperPPE: violationCheck.isAllProperPPE,
       });
     } catch (error) {
       console.error("Frame processing error:", error);
@@ -187,6 +202,9 @@ export class WebSocketHandler {
 
       if (session) {
         session.isActive = false;
+
+        // Stop PPE tracking for this session
+        this.ppeTracker.stopEmailAlertTimer(sessionId);
 
         // Send final stats
         socket.emit("detection_stopped", {
@@ -218,6 +236,9 @@ export class WebSocketHandler {
       if (session) {
         session.isActive = false;
         this.activeSessions.delete(sessionId);
+
+        // Unregister from PPE tracker
+        this.ppeTracker.unregisterSession(sessionId);
 
         console.log(`👋 Session cleaned up: ${sessionId}`);
       }
@@ -275,4 +296,3 @@ export class WebSocketHandler {
     }
   }
 }
-

@@ -9,6 +9,8 @@ import {
   Square,
   Wifi,
   WifiOff,
+  AlertTriangle,
+  CheckCircle,
 } from "lucide-react";
 import Navbar from "@/components/Navbar";
 import DetectionResults from "@/components/DetectionResults";
@@ -337,6 +339,43 @@ const LiveDetection = () => {
                 </div>
               )}
             </div>
+
+            {/* PPE Violation Alert */}
+            {lastDetection &&
+              lastDetection.hasViolations &&
+              lastDetection.ppeViolations &&
+              lastDetection.ppeViolations.length > 0 && (
+                <div className="flex items-center justify-center mt-4">
+                  <div className="flex items-center gap-3 px-4 py-3 rounded-lg bg-red-500/20 text-red-600 border border-red-500/30 animate-pulse">
+                    <AlertTriangle className="w-5 h-5" />
+                    <div>
+                      <p className="font-semibold">PPE Violation Detected!</p>
+                      <p className="text-sm">
+                        Missing:{" "}
+                        {lastDetection.ppeViolations
+                          .map((v) => v.replace(/-/g, " "))
+                          .join(", ")}
+                      </p>
+                      <p className="text-xs text-red-500/80 mt-1">
+                        Alert email will be sent every 5 minutes until resolved
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+            {/* PPE All Clear Alert */}
+            {lastDetection && lastDetection.isAllProperPPE && (
+              <div className="flex items-center justify-center mt-4">
+                <div className="flex items-center gap-3 px-4 py-3 rounded-lg bg-green-500/20 text-green-600 border border-green-500/30">
+                  <CheckCircle className="w-5 h-5" />
+                  <div>
+                    <p className="font-semibold">All PPE Properly Worn</p>
+                    <p className="text-sm">No violations detected</p>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
 
           <Card className="p-6 bg-card/50 backdrop-blur-sm border-border">

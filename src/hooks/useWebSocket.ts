@@ -35,6 +35,9 @@ interface DetectionResult {
     avgProcessingTime: number;
     totalFrames: number;
   };
+  ppeViolations?: string[];
+  hasViolations?: boolean;
+  isAllProperPPE?: boolean;
 }
 
 interface WebSocketHook {
@@ -259,4 +262,3 @@ export const useWebSocket = (
     stats,
   };
 };
-
