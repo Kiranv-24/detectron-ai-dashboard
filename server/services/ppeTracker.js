@@ -1,4 +1,5 @@
 import { EmailService } from "./emailService.js";
+import { ViolationStorageService } from "./violationStorageService.js";
 
 export class PPETracker {
   constructor() {
@@ -7,6 +8,7 @@ export class PPETracker {
     this.emailTimers = new Map(); // Store email timer for each session
     this.alertInterval = 5 * 60 * 1000; // 5 minutes in milliseconds
     this.emailService = new EmailService();
+    this.violationStorage = new ViolationStorageService();
 
     // Define PPE violation classes
     this.violationClasses = [
@@ -106,6 +108,20 @@ export class PPETracker {
       // Store last violation image
       if (imageBuffer) {
         this.lastViolationImage.set(sessionId, imageBuffer);
+      }
+
+      // Store violation in database and generate PDF
+      try {
+        this.violationStorage.storeViolation(
+          detections,
+          imageBuffer,
+          "Live Detection"
+        );
+        console.log(
+          `📋 Violation stored and PDF generated for session ${sessionId}`
+        );
+      } catch (error) {
+        console.error("Error storing violation:", error);
       }
 
       // Start or reset email alert timer if not already running

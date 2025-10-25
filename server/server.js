@@ -11,6 +11,8 @@ import { RateLimiterMemory } from "rate-limiter-flexible";
 import { RoboflowService } from "./services/roboflow.js";
 import { WebSocketHandler } from "./services/websocket.js";
 import { ImageProcessor } from "./services/imageProcessor.js";
+import { ViolationStorageService } from "./services/violationStorageService.js";
+import { PDFReportService } from "./services/pdfReportService.js";
 
 // Load environment variables
 dotenv.config();
@@ -74,6 +76,8 @@ const upload = multer({
 // Initialize services
 const roboflowService = new RoboflowService();
 const imageProcessor = new ImageProcessor();
+const violationStorage = new ViolationStorageService();
+const pdfService = new PDFReportService();
 const wsHandler = new WebSocketHandler(io, roboflowService, imageProcessor);
 
 // Health check endpoint
@@ -107,6 +111,75 @@ app.post("/api/detect/image", upload.single("image"), async (req, res) => {
       error: "Detection failed",
       message: error.message,
     });
+  }
+});
+
+// Violation Reports API endpoints
+app.get("/api/violations/reports", async (req, res) => {
+  try {
+    const reports = pdfService.getAllReports();
+    res.json(reports);
+  } catch (error) {
+    console.error("Error fetching reports:", error);
+    res.status(500).json({ error: "Failed to fetch reports" });
+  }
+});
+
+app.get("/api/violations/data", async (req, res) => {
+  try {
+    const violations = violationStorage.getRecentViolations(20);
+    res.json(violations);
+  } catch (error) {
+    console.error("Error fetching violations:", error);
+    res.status(500).json({ error: "Failed to fetch violations" });
+  }
+});
+
+app.get("/api/violations/statistics", async (req, res) => {
+  try {
+    const stats = violationStorage.getStatistics();
+    res.json(stats);
+  } catch (error) {
+    console.error("Error fetching statistics:", error);
+    res.status(500).json({ error: "Failed to fetch statistics" });
+  }
+});
+
+app.get("/api/violations/download/:fileName", async (req, res) => {
+  try {
+    const { fileName } = req.params;
+    const reports = pdfService.getAllReports();
+    const report = reports.find((r) => r.fileName === fileName);
+
+    if (!report) {
+      return res.status(404).json({ error: "Report not found" });
+    }
+
+    res.download(report.path, fileName, (err) => {
+      if (err) {
+        console.error("Download error:", err);
+        res.status(500).json({ error: "Failed to download report" });
+      }
+    });
+  } catch (error) {
+    console.error("Error downloading report:", error);
+    res.status(500).json({ error: "Failed to download report" });
+  }
+});
+
+app.delete("/api/violations/delete/:fileName", async (req, res) => {
+  try {
+    const { fileName } = req.params;
+    const success = pdfService.deleteReport(fileName);
+
+    if (success) {
+      res.json({ message: "Report deleted successfully" });
+    } else {
+      res.status(500).json({ error: "Failed to delete report" });
+    }
+  } catch (error) {
+    console.error("Error deleting report:", error);
+    res.status(500).json({ error: "Failed to delete report" });
   }
 });
 
@@ -187,4 +260,3 @@ process.on("SIGINT", () => {
     process.exit(0);
   });
 });
-

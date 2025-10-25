@@ -6,6 +6,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import Home from "./pages/Home";
 import UploadDetection from "./pages/UploadDetection";
 import LiveDetection from "./pages/LiveDetection";
+import ViolationsPage from "./pages/ViolationsPage";
 import About from "./pages/About";
 import NotFound from "./pages/NotFound";
 
@@ -18,9 +19,10 @@ const App = () => (
       <Sonner />
       <BrowserRouter>
         <Routes>
-          <Route path="/" element={<Home />} />
+          <Route path="/" element={<LiveDetection />} />
           <Route path="/upload" element={<UploadDetection />} />
           <Route path="/live" element={<LiveDetection />} />
+          <Route path="/violations" element={<ViolationsPage />} />
           <Route path="/about" element={<About />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />

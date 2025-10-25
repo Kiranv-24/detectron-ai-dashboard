@@ -1,11 +1,11 @@
 import { Link, useLocation } from "react-router-dom";
-import { Brain } from "lucide-react";
+import { Brain, Camera, FileText, Upload } from "lucide-react";
 
 const Navbar = () => {
   const location = useLocation();
-  
+
   const isActive = (path: string) => location.pathname === path;
-  
+
   return (
     <nav className="fixed top-0 left-0 right-0 z-50 bg-card/80 backdrop-blur-md border-b border-border">
       <div className="container mx-auto px-4 py-4">
@@ -18,15 +18,34 @@ const Navbar = () => {
               AI Vision
             </span>
           </Link>
-          
+
           <div className="flex items-center gap-6">
             <Link
               to="/"
-              className={`text-sm font-medium transition-colors hover:text-accent ${
+              className={`flex items-center gap-2 text-sm font-medium transition-colors hover:text-accent ${
                 isActive("/") ? "text-accent" : "text-foreground/80"
               }`}
             >
-              Home
+              <Camera className="w-4 h-4" />
+              Live Detection
+            </Link>
+            <Link
+              to="/upload"
+              className={`flex items-center gap-2 text-sm font-medium transition-colors hover:text-accent ${
+                isActive("/upload") ? "text-accent" : "text-foreground/80"
+              }`}
+            >
+              <Upload className="w-4 h-4" />
+              Upload Detection
+            </Link>
+            <Link
+              to="/violations"
+              className={`flex items-center gap-2 text-sm font-medium transition-colors hover:text-accent ${
+                isActive("/violations") ? "text-accent" : "text-foreground/80"
+              }`}
+            >
+              <FileText className="w-4 h-4" />
+              Violations
             </Link>
             <Link
               to="/about"
