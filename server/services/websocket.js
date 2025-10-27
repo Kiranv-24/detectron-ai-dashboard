@@ -10,8 +10,10 @@ export class WebSocketHandler {
     this.ppeTracker = new PPETracker();
     this.activeSessions = new Map();
     this.frameProcessingQueue = new Map();
-    this.maxConcurrentProcessing = 3;
+    this.maxConcurrentProcessing = 5; // Increased from 3
+    this.currentProcessingCount = 0;
     this.frameInterval = 200; // Process frames every 200ms (5 FPS)
+    this.frameDropThreshold = 3; // Drop old frames if queue is too long
   }
 
   /**
@@ -41,6 +43,8 @@ export class WebSocketHandler {
           processedFrames: 0,
           errors: 0,
           avgProcessingTime: 0,
+          startTime: Date.now(),
+          droppedFrames: 0,
         },
       });
 
@@ -97,9 +101,15 @@ export class WebSocketHandler {
         sessionId,
       };
 
+      // Drop old frames if queue is getting too long
+      if (session.processingQueue.length > this.frameDropThreshold) {
+        session.processingQueue.shift(); // Remove oldest frame
+        session.stats.droppedFrames = (session.stats.droppedFrames || 0) + 1;
+      }
+
       session.processingQueue.push(frameData);
 
-      // Process frame asynchronously
+      // Process frame asynchronously with queue management
       this.processFrameAsync(socket, frameData, session);
     } catch (error) {
       console.error("Error handling frame data:", error);
@@ -111,12 +121,22 @@ export class WebSocketHandler {
   }
 
   /**
-   * Process frame asynchronously
+   * Process frame asynchronously with concurrency control
    * @param {Object} socket - WebSocket socket instance
    * @param {Object} frameData - Frame data to process
    * @param {Object} session - Session information
    */
   async processFrameAsync(socket, frameData, session) {
+    // Check if we can process more frames concurrently
+    if (this.currentProcessingCount >= this.maxConcurrentProcessing) {
+      // Queue is full, frame will be processed when capacity is available
+      // The latest frame will be taken from the queue when ready
+      return;
+    }
+
+    // Increment processing count
+    this.currentProcessingCount++;
+
     try {
       const startTime = Date.now();
 
@@ -126,12 +146,12 @@ export class WebSocketHandler {
         "base64"
       );
 
-      // Process image
+      // Process image (can skip resizing if image is already appropriate size)
       const processedImage = await this.imageProcessor.processImage(
         imageBuffer
       );
 
-      // Run detection
+      // Run detection (use faster inference if available)
       const detectionResult = await this.roboflowService.detectObjects(
         processedImage
       );
@@ -141,8 +161,12 @@ export class WebSocketHandler {
       // Update session stats
       session.stats.totalFrames++;
       session.stats.processedFrames++;
+
+      // Use exponential moving average for smoother stats
       session.stats.avgProcessingTime =
-        (session.stats.avgProcessingTime + processingTime) / 2;
+        session.stats.avgProcessingTime === 0
+          ? processingTime
+          : session.stats.avgProcessingTime * 0.7 + processingTime * 0.3;
 
       // Filter detections by confidence
       const filteredDetections = detectionResult.detections
@@ -151,12 +175,33 @@ export class WebSocketHandler {
         )
         .slice(0, session.config.maxDetections);
 
-      // Process PPE violations
-      const violationCheck = this.ppeTracker.processDetection(
+      // Draw bounding boxes on image if there are detections
+      let annotatedImageBuffer = imageBuffer;
+      if (filteredDetections.length > 0) {
+        try {
+          annotatedImageBuffer = await this.imageProcessor.drawBoundingBoxes(
+            imageBuffer,
+            filteredDetections
+          );
+        } catch (error) {
+          console.error("Error drawing bounding boxes:", error);
+          // Use original image if drawing fails
+          annotatedImageBuffer = imageBuffer;
+        }
+      }
+
+      // Process PPE violations and get results - pass annotated image
+      const violationCheck = await this.ppeTracker.processDetection(
         frameData.sessionId,
         filteredDetections,
-        imageBuffer
+        annotatedImageBuffer
       );
+
+      console.log(`📊 Violation check result:`, {
+        hasViolations: violationCheck.hasViolations,
+        violations: violationCheck.violations,
+        imageBufferSize: imageBuffer ? imageBuffer.length : 0,
+      });
 
       // Send results to client with PPE violation info
       socket.emit("detection_result", {
@@ -167,12 +212,13 @@ export class WebSocketHandler {
         timestamp: new Date().toISOString(),
         stats: {
           fps:
-            session.stats.totalFrames > 0
+            session.stats.processedFrames > 0
               ? session.stats.processedFrames /
-                ((Date.now() - session.lastProcessedTime) / 1000)
+                ((Date.now() - session.stats.startTime || Date.now()) / 1000)
               : 0,
           avgProcessingTime: session.stats.avgProcessingTime,
           totalFrames: session.stats.totalFrames,
+          droppedFrames: session.stats.droppedFrames || 0,
         },
         ppeViolations: violationCheck.violations,
         hasViolations: violationCheck.hasViolations,
@@ -188,6 +234,20 @@ export class WebSocketHandler {
         error: "Processing failed",
         message: error.message,
       });
+    } finally {
+      // Decrement processing count when done
+      this.currentProcessingCount--;
+
+      // Check if there are more frames in the queue to process
+      if (
+        session.processingQueue.length > 0 &&
+        frameData.id < session.frameCount
+      ) {
+        const nextFrame = session.processingQueue.shift();
+        if (nextFrame) {
+          this.processFrameAsync(socket, nextFrame, session);
+        }
+      }
     }
   }
 

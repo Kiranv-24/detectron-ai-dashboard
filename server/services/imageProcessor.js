@@ -18,6 +18,15 @@ export class ImageProcessor {
       const image = sharp(imageBuffer);
       const metadata = await image.metadata();
 
+      // Skip processing if image is already within acceptable range
+      if (
+        metadata.width <= this.maxWidth &&
+        metadata.height <= this.maxHeight
+      ) {
+        // Image is already within bounds, return as-is for faster processing
+        return imageBuffer;
+      }
+
       // Get optimal dimensions
       const { width, height } = this.calculateOptimalDimensions(
         metadata.width,
@@ -187,5 +196,93 @@ export class ImageProcessor {
       throw new Error(`Batch processing failed: ${error.message}`);
     }
   }
-}
 
+  /**
+   * Draw bounding boxes on image with detections using SVG overlay
+   * @param {Buffer} imageBuffer - Original image buffer
+   * @param {Array} detections - Detection results with bbox info
+   * @returns {Promise<Buffer>} Annotated image buffer
+   */
+  async drawBoundingBoxes(imageBuffer, detections) {
+    try {
+      if (!detections || detections.length === 0) {
+        return imageBuffer; // Return original if no detections
+      }
+
+      // Load image metadata
+      const metadata = await sharp(imageBuffer).metadata();
+      const width = metadata.width || 640;
+      const height = metadata.height || 480;
+
+      // Build SVG overlay with bounding boxes
+      let svgElements = [];
+
+      detections.forEach((detection, index) => {
+        if (!detection.bbox) return;
+
+        const { x1, y1, x2, y2 } = detection.bbox;
+        const className = detection.class || "";
+        const confidence = detection.confidence || 0;
+        const boxWidth = x2 - x1;
+        const boxHeight = y2 - y1;
+
+        // Determine color based on whether it's a violation
+        const isViolation =
+          className.toLowerCase().includes("no-") ||
+          className.toLowerCase().includes("missing");
+        const color = isViolation ? "#ff1744" : "#00ff00"; // Red for violations, green for proper PPE
+
+        // Draw bounding box rectangle
+        svgElements.push(
+          `<rect x="${x1}" y="${y1}" width="${boxWidth}" height="${boxHeight}" 
+           fill="none" stroke="${color}" stroke-width="4" opacity="0.9"/>`
+        );
+
+        // Draw label background
+        const label = `${className} ${(confidence * 100).toFixed(0)}%`;
+        const textWidth = label.length * 9; // Approximate text width
+        const textHeight = 28;
+
+        svgElements.push(
+          `<rect x="${x1}" y="${y1 - textHeight}" width="${
+            textWidth + 16
+          }" height="${textHeight}" 
+           fill="${color}" opacity="0.9"/>`
+        );
+
+        svgElements.push(
+          `<rect x="${x1}" y="${y1 - textHeight}" width="${
+            textWidth + 16
+          }" height="${textHeight}" 
+           fill="none" stroke="rgba(255,255,255,0.3)" stroke-width="1"/>`
+        );
+
+        // Draw label text
+        svgElements.push(
+          `<text x="${x1 + 8}" y="${y1 - 10}" fill="white" font-family="Arial" 
+           font-size="18" font-weight="bold">${label}</text>`
+        );
+      });
+
+      const svg = `
+        <svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg">
+          ${svgElements.join("\n")}
+        </svg>
+      `;
+
+      // Composite the SVG overlay onto the image
+      const annotatedBuffer = await sharp(imageBuffer)
+        .composite([{ input: Buffer.from(svg), blend: "over" }])
+        .png()
+        .toBuffer();
+
+      console.log(
+        `✅ Drew ${detections.length} bounding boxes on image using SVG overlay`
+      );
+      return annotatedBuffer;
+    } catch (error) {
+      console.error("Error drawing bounding boxes:", error);
+      return imageBuffer; // Return original on error
+    }
+  }
+}

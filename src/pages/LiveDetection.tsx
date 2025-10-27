@@ -201,30 +201,65 @@ const LiveDetection = () => {
 
     // Draw bounding boxes
     detections.forEach((detection, index) => {
-      const { x, y, width, height, class: className, confidence } = detection;
+      const {
+        x,
+        y,
+        width,
+        height,
+        class: className,
+        confidence,
+        bbox,
+      } = detection;
 
-      // Scale coordinates from processed image back to video dimensions
-      const scaledX = x * scaleX;
-      const scaledY = y * scaleY;
-      const scaledWidth = width * scaleX;
-      const scaledHeight = height * scaleY;
+      // Use bbox if available (absolute coordinates), otherwise calculate from center
+      let canvasX, canvasY, canvasWidth, canvasHeight;
 
-      // Roboflow API returns center coordinates, convert to top-left
-      const canvasX = scaledX - scaledWidth / 2;
-      const canvasY = scaledY - scaledHeight / 2;
-      const canvasWidth = scaledWidth;
-      const canvasHeight = scaledHeight;
+      if (bbox && bbox.x1 !== undefined) {
+        // Use absolute bounding box coordinates
+        canvasX = bbox.x1 * scaleX;
+        canvasY = bbox.y1 * scaleY;
+        canvasWidth = (bbox.x2 - bbox.x1) * scaleX;
+        canvasHeight = (bbox.y2 - bbox.y1) * scaleY;
+      } else {
+        // Calculate from center coordinates (fallback)
+        const scaledX = x * scaleX;
+        const scaledY = y * scaleY;
+        const scaledWidth = width * scaleX;
+        const scaledHeight = height * scaleY;
 
-      // Choose color based on class with better contrast
-      const colors = [
-        "#00ff00", // Bright green for person
-        "#ff6b35", // Orange for helmet violations
-        "#ff1744", // Red for mask violations
-        "#ffd700", // Gold for jacket violations
-        "#00bcd4", // Cyan for other safety items
-        "#9c27b0", // Purple for additional items
-      ];
-      const color = colors[index % colors.length];
+        canvasX = scaledX - scaledWidth / 2;
+        canvasY = scaledY - scaledHeight / 2;
+        canvasWidth = scaledWidth;
+        canvasHeight = scaledHeight;
+      }
+
+      // Choose color based on class type (violations vs proper PPE)
+      const isViolation =
+        className.toLowerCase().includes("no-") ||
+        className.toLowerCase().includes("no_") ||
+        className.toLowerCase().includes("missing");
+
+      const isProperPPE =
+        (className.toLowerCase().includes("helmet") &&
+          !className.toLowerCase().includes("no")) ||
+        (className.toLowerCase().includes("jacket") &&
+          !className.toLowerCase().includes("no")) ||
+        (className.toLowerCase().includes("mask") &&
+          !className.toLowerCase().includes("no")) ||
+        (className.toLowerCase().includes("shoes") &&
+          !className.toLowerCase().includes("no")) ||
+        (className.toLowerCase().includes("belt") &&
+          !className.toLowerCase().includes("no"));
+
+      // Use red for violations, green for proper PPE, cyan for person
+      let color = "#00bcd4"; // Default cyan
+      if (isViolation) {
+        color = "#ff1744"; // Red for violations
+      } else if (isProperPPE) {
+        color = "#00ff00"; // Green for proper PPE
+      } else if (className.toLowerCase() === "person") {
+        color = "#2196F3"; // Blue for person
+      }
 
       // Draw bounding box with thicker line for better visibility
       ctx.strokeStyle = color;

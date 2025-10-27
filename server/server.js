@@ -80,6 +80,9 @@ const violationStorage = new ViolationStorageService();
 const pdfService = new PDFReportService();
 const wsHandler = new WebSocketHandler(io, roboflowService, imageProcessor);
 
+// Start PDF generation timer (every 15 minutes)
+violationStorage.startPDFGenerationTimer();
+
 // Health check endpoint
 app.get("/health", (req, res) => {
   res.json({
@@ -180,6 +183,21 @@ app.delete("/api/violations/delete/:fileName", async (req, res) => {
   } catch (error) {
     console.error("Error deleting report:", error);
     res.status(500).json({ error: "Failed to delete report" });
+  }
+});
+
+// Manual PDF generation endpoint (for testing)
+app.post("/api/violations/generate-pdfs", async (req, res) => {
+  try {
+    const generatedPDFs = await violationStorage.generatePendingPDFs();
+    res.json({
+      message: "PDF generation completed",
+      generatedCount: generatedPDFs.length,
+      pdfs: generatedPDFs,
+    });
+  } catch (error) {
+    console.error("Error generating PDFs:", error);
+    res.status(500).json({ error: "Failed to generate PDFs" });
   }
 });
 

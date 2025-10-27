@@ -48,9 +48,22 @@ export class EmailService {
    * @param {Date} options.timestamp - Timestamp of the violation
    */
   async sendViolationAlert({ to, imageBuffer, violations, timestamp }) {
+    console.log(
+      `📧 Email send attempt: configured=${
+        this.isConfigured
+      }, hasTransporter=${!!this
+        .transporter}, hasImage=${!!imageBuffer}, imageSize=${
+        imageBuffer ? imageBuffer.length : 0
+      }`
+    );
+
     if (!this.isConfigured || !this.transporter) {
       console.warn("⚠️ Email service not configured. Skipping email alert.");
       return { success: false, message: "Email service not configured" };
+    }
+
+    if (!imageBuffer) {
+      console.warn("⚠️ No image buffer provided for email alert.");
     }
 
     const fromEmail = process.env.SMTP_FROM_EMAIL || process.env.SMTP_USERNAME;
@@ -70,13 +83,16 @@ export class EmailService {
         <html>
         <head>
           <style>
-            body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
-            .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+            body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 0; }
+            .container { max-width: 800px; margin: 0 auto; padding: 20px; background-color: #f8f9fa; }
             .header { background-color: #dc3545; color: white; padding: 20px; text-align: center; border-radius: 5px 5px 0 0; }
-            .content { background-color: #f8f9fa; padding: 20px; border: 1px solid #dee2e6; }
+            .content { background-color: white; padding: 20px; border: 1px solid #dee2e6; }
             .violations { background-color: #fff3cd; border-left: 4px solid #ffc107; padding: 15px; margin: 20px 0; }
             .footer { background-color: #e9ecef; padding: 15px; text-align: center; font-size: 12px; color: #6c757d; border-radius: 0 0 5px 5px; }
             .timestamp { color: #6c757d; font-size: 14px; }
+            .image-container { text-align: center; margin: 20px 0; }
+            .violation-image { max-width: 100%; height: auto; border: 2px solid #dc3545; border-radius: 5px; }
+            .alert-badge { display: inline-block; background-color: #dc3545; color: white; padding: 5px 15px; border-radius: 20px; font-weight: bold; margin: 10px 0; }
           </style>
         </head>
         <body>
@@ -93,9 +109,19 @@ export class EmailService {
                 <pre style="white-space: pre-wrap; font-family: Arial, sans-serif;">${violationList}</pre>
               </div>
 
+              <div class="image-container">
+                ${
+                  imageBuffer
+                    ? `<img src="cid:violation_image" alt="PPE Violation Image" class="violation-image" />`
+                    : '<p style="color: #999;">Image not available</p>'
+                }
+                <br/>
+                <span class="alert-badge">🔴 URGENT ACTION REQUIRED</span>
+              </div>
+
               <p class="timestamp"><strong>Detection Time:</strong> ${timestamp.toLocaleString()}</p>
               
-              <p>Please review the attached image for details and take appropriate action.</p>
+              <p>Please review the image above and attached file for details and take appropriate action.</p>
               
               <p><strong>Action Required:</strong></p>
               <ul>
@@ -131,14 +157,23 @@ Action Required:
 
 This is an automated alert from the PPE Detection System.
       `,
-      attachments: [
+    };
+
+    // Add attachment only if image buffer exists
+    if (imageBuffer) {
+      mailOptions.attachments = [
         {
           filename: `ppe_violation_${timestamp.getTime()}.jpg`,
           content: imageBuffer,
           cid: "violation_image",
         },
-      ],
-    };
+      ];
+      console.log(
+        `📎 Image attached to email (size: ${imageBuffer.length} bytes)`
+      );
+    } else {
+      console.warn(`⚠️ No image buffer provided for email attachment`);
+    }
 
     try {
       const info = await this.transporter.sendMail(mailOptions);

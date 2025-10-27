@@ -32,6 +32,76 @@ export class PPETracker {
   }
 
   /**
+   * Normalize class name for matching
+   * @param {string} className - Class name to normalize
+   * @returns {string} Normalized class name
+   */
+  normalizeClassName(className) {
+    if (!className) return "";
+
+    // Normalize common variations
+    return className
+      .toLowerCase()
+      .replace(/\s+/g, "-") // Replace spaces with hyphens
+      .replace(/_/g, "-") // Replace underscores with hyphens
+      .trim();
+  }
+
+  /**
+   * Check if a class is a violation
+   * @param {string} className - Class name to check
+   * @returns {boolean} True if violation
+   */
+  isViolationClass(className) {
+    const normalized = this.normalizeClassName(className);
+
+    // Check exact matches
+    for (const violationClass of this.violationClasses) {
+      if (normalized === this.normalizeClassName(violationClass)) {
+        return true;
+      }
+    }
+
+    // Check for violation patterns
+    return (
+      normalized.includes("no-") ||
+      normalized.includes("no_") ||
+      normalized.includes("missing-") ||
+      normalized.includes("missing_")
+    );
+  }
+
+  /**
+   * Check if a class is proper PPE
+   * @param {string} className - Class name to check
+   * @returns {boolean} True if proper PPE
+   */
+  isProperPPEClass(className) {
+    const normalized = this.normalizeClassName(className);
+
+    // Don't count if it's a violation
+    if (this.isViolationClass(className)) {
+      return false;
+    }
+
+    // Check exact matches
+    for (const ppeClass of this.properPPEClasses) {
+      if (normalized === this.normalizeClassName(ppeClass)) {
+        return true;
+      }
+    }
+
+    // Check for PPE keywords
+    return (
+      normalized.includes("helmet") ||
+      normalized.includes("jacket") ||
+      normalized.includes("mask") ||
+      normalized.includes("shoe") ||
+      normalized.includes("belt")
+    );
+  }
+
+  /**
    * Check if detections contain PPE violations
    * @param {Array} detections - Array of detection objects
    * @returns {Object} Object containing violations and their details
@@ -53,13 +123,13 @@ export class PPETracker {
     detections.forEach((detection) => {
       const className = detection.class || "";
 
-      // Check if it's a violation
-      if (this.violationClasses.includes(className)) {
+      // Check if it's a violation with fuzzy matching
+      if (this.isViolationClass(className)) {
         detectedViolations.push(className);
       }
 
       // Check if it's proper PPE
-      if (this.properPPEClasses.includes(className)) {
+      if (this.isProperPPEClass(className)) {
         detectedPPE.push(className);
       }
     });
@@ -93,7 +163,7 @@ export class PPETracker {
    * @param {Array} detections - Detection results
    * @param {Buffer} imageBuffer - Image buffer
    */
-  processDetection(sessionId, detections, imageBuffer) {
+  async processDetection(sessionId, detections, imageBuffer) {
     const violationCheck = this.checkViolations(detections);
 
     if (violationCheck.hasViolations) {
@@ -110,16 +180,45 @@ export class PPETracker {
         this.lastViolationImage.set(sessionId, imageBuffer);
       }
 
-      // Store violation in database and generate PDF
+      // Store violation in database (PDF will be generated every 15 minutes)
       try {
-        this.violationStorage.storeViolation(
+        const result = await this.violationStorage.storeViolation(
           detections,
           imageBuffer,
           "Live Detection"
         );
         console.log(
-          `📋 Violation stored and PDF generated for session ${sessionId}`
+          `📋 Violation stored for session ${sessionId} - PDF will be generated`
         );
+        console.log(`📊 Storage result:`, result);
+
+        // Try to generate PDF immediately if there's a pending flag
+        if (result && result.pendingPDFGeneration) {
+          console.log(
+            `🚀 Triggering immediate PDF generation for ${result.personId}`
+          );
+          // Use setImmediate to avoid blocking
+          setImmediate(async () => {
+            try {
+              const generated =
+                await this.violationStorage.generatePendingPDFs();
+              if (generated && generated.length > 0) {
+                console.log(
+                  `✅ Successfully generated ${generated.length} PDF(s)`
+                );
+                generated.forEach((path) => console.log(`   - ${path}`));
+              } else {
+                console.log(`⚠️ No PDFs were generated`);
+              }
+            } catch (error) {
+              console.error("Error generating PDF immediately:", error);
+            }
+          });
+        } else {
+          console.log(
+            `⚠️ PDF generation NOT triggered - pendingPDFGeneration: ${result?.pendingPDFGeneration}`
+          );
+        }
       } catch (error) {
         console.error("Error storing violation:", error);
       }
@@ -216,6 +315,11 @@ export class PPETracker {
 
     console.log(`📧 Preparing to send email alert for session ${sessionId}`);
     console.log(`   Violations: ${violations.join(", ")}`);
+    console.log(
+      `   ImageBuffer: ${
+        imageBuffer ? `Yes (${imageBuffer.length} bytes)` : "NO IMAGE"
+      }`
+    );
 
     try {
       const result = await this.emailService.sendViolationAlert({
