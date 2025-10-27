@@ -1,5 +1,5 @@
 import { Link, useLocation } from "react-router-dom";
-import { Brain, Camera, FileText, Upload } from "lucide-react";
+import { Brain, Camera, FileText, Upload, Video } from "lucide-react";
 
 const Navbar = () => {
   const location = useLocation();
@@ -36,7 +36,16 @@ const Navbar = () => {
               }`}
             >
               <Upload className="w-4 h-4" />
-              Upload Detection
+              Image Upload
+            </Link>
+            <Link
+              to="/video"
+              className={`flex items-center gap-2 text-sm font-medium transition-colors hover:text-accent ${
+                isActive("/video") ? "text-accent" : "text-foreground/80"
+              }`}
+            >
+              <Video className="w-4 h-4" />
+              Video Analysis
             </Link>
             <Link
               to="/violations"

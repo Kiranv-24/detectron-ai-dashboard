@@ -6,6 +6,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import Home from "./pages/Home";
 import UploadDetection from "./pages/UploadDetection";
 import LiveDetection from "./pages/LiveDetection";
+import VideoAnalysis from "./pages/VideoAnalysis";
 import ViolationsPage from "./pages/ViolationsPage";
 import About from "./pages/About";
 import NotFound from "./pages/NotFound";
@@ -22,6 +23,7 @@ const App = () => (
           <Route path="/" element={<LiveDetection />} />
           <Route path="/upload" element={<UploadDetection />} />
           <Route path="/live" element={<LiveDetection />} />
+          <Route path="/video" element={<VideoAnalysis />} />
           <Route path="/violations" element={<ViolationsPage />} />
           <Route path="/about" element={<About />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}

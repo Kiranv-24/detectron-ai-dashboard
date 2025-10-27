@@ -10,13 +10,18 @@ const __dirname = path.dirname(__filename);
 
 export class LocalDetector {
   constructor(options = {}) {
-    this.modelPath = options.modelPath || process.env.LOCAL_MODEL_PATH || path.resolve("./yolo8n.pt");
+    this.modelPath =
+      options.modelPath ||
+      process.env.LOCAL_MODEL_PATH ||
+      path.resolve("./yolo8n.pt");
     this.pythonPath = options.pythonPath || process.env.PYTHON_PATH || "python"; // Allow override
 
     // Basic check for model file existence
     try {
       if (!fs.existsSync(this.modelPath)) {
-        console.warn(`⚠️  Local model not found at ${this.modelPath}. Local detection will fall back to mock.`);
+        console.warn(
+          `⚠️  Local model not found at ${this.modelPath}. Local detection will fall back to mock.`
+        );
       }
     } catch (err) {
       console.warn("⚠️  Could not verify local model file:", err.message);
@@ -37,13 +42,17 @@ export class LocalDetector {
 
       // Call Python runner which loads ultralytics/yolov8 and runs inference.
       // The Python script should print JSON to stdout.
-  const scriptPath = path.resolve(path.join(__dirname, "run_yolo.py"));
+      const scriptPath = path.resolve(path.join(__dirname, "run_yolo.py"));
 
       try {
-        const out = execFileSync(this.pythonPath, [scriptPath, imagePath, this.modelPath], {
-          stdio: ["ignore", "pipe", "pipe"],
-          maxBuffer: 10 * 1024 * 1024,
-        });
+        const out = execFileSync(
+          this.pythonPath,
+          [scriptPath, imagePath, this.modelPath],
+          {
+            stdio: ["ignore", "pipe", "pipe"],
+            maxBuffer: 10 * 1024 * 1024,
+          }
+        );
 
         const text = out.toString("utf8");
         // Log raw python output for debugging
@@ -53,15 +62,22 @@ export class LocalDetector {
         try {
           data = JSON.parse(text);
         } catch (parseErr) {
-          console.error("LocalDetector JSON parse error:", parseErr.message || parseErr);
-          console.log("🔄 Falling back to mock detections from LocalDetector (invalid JSON)");
+          console.error(
+            "LocalDetector JSON parse error:",
+            parseErr.message || parseErr
+          );
+          console.log(
+            "🔄 Falling back to mock detections from LocalDetector (invalid JSON)"
+          );
           return this.getMockDetections();
         }
 
         // If python script returned an error key, log and fallback to mock
         if (data && data.error) {
           console.error("LocalDetector python error:", data.error);
-          console.log("🔄 Falling back to mock detections from LocalDetector (python error)");
+          console.log(
+            "🔄 Falling back to mock detections from LocalDetector (python error)"
+          );
           return this.getMockDetections();
         }
 
@@ -78,7 +94,7 @@ export class LocalDetector {
       // Cleanup temp files
       try {
         if (fs.existsSync(imagePath)) fs.unlinkSync(imagePath);
-        fs.rmdirSync(tempDir, { recursive: true });
+        fs.rmSync(tempDir, { recursive: true, force: true });
       } catch (e) {
         // ignore cleanup errors
       }
@@ -112,11 +128,18 @@ export class LocalDetector {
   }
 
   getMockDetections() {
-    const mockClasses = ["person", "helmet", "no-jacket", "safety belt", "jacket"];
+    const mockClasses = [
+      "person",
+      "helmet",
+      "no-jacket",
+      "safety belt",
+      "jacket",
+    ];
     const numDetections = Math.floor(Math.random() * 4) + 1;
 
     const detections = Array.from({ length: numDetections }, (_, i) => {
-      const randomClass = mockClasses[Math.floor(Math.random() * mockClasses.length)];
+      const randomClass =
+        mockClasses[Math.floor(Math.random() * mockClasses.length)];
       const confidence = 0.6 + Math.random() * 0.35;
 
       return {

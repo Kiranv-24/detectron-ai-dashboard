@@ -32,76 +32,6 @@ export class PPETracker {
   }
 
   /**
-   * Normalize class name for matching
-   * @param {string} className - Class name to normalize
-   * @returns {string} Normalized class name
-   */
-  normalizeClassName(className) {
-    if (!className) return "";
-
-    // Normalize common variations
-    return className
-      .toLowerCase()
-      .replace(/\s+/g, "-") // Replace spaces with hyphens
-      .replace(/_/g, "-") // Replace underscores with hyphens
-      .trim();
-  }
-
-  /**
-   * Check if a class is a violation
-   * @param {string} className - Class name to check
-   * @returns {boolean} True if violation
-   */
-  isViolationClass(className) {
-    const normalized = this.normalizeClassName(className);
-
-    // Check exact matches
-    for (const violationClass of this.violationClasses) {
-      if (normalized === this.normalizeClassName(violationClass)) {
-        return true;
-      }
-    }
-
-    // Check for violation patterns
-    return (
-      normalized.includes("no-") ||
-      normalized.includes("no_") ||
-      normalized.includes("missing-") ||
-      normalized.includes("missing_")
-    );
-  }
-
-  /**
-   * Check if a class is proper PPE
-   * @param {string} className - Class name to check
-   * @returns {boolean} True if proper PPE
-   */
-  isProperPPEClass(className) {
-    const normalized = this.normalizeClassName(className);
-
-    // Don't count if it's a violation
-    if (this.isViolationClass(className)) {
-      return false;
-    }
-
-    // Check exact matches
-    for (const ppeClass of this.properPPEClasses) {
-      if (normalized === this.normalizeClassName(ppeClass)) {
-        return true;
-      }
-    }
-
-    // Check for PPE keywords
-    return (
-      normalized.includes("helmet") ||
-      normalized.includes("jacket") ||
-      normalized.includes("mask") ||
-      normalized.includes("shoe") ||
-      normalized.includes("belt")
-    );
-  }
-
-  /**
    * Check if detections contain PPE violations
    * @param {Array} detections - Array of detection objects
    * @returns {Object} Object containing violations and their details
@@ -110,7 +40,7 @@ export class PPETracker {
     const detectedViolations = [];
     const detectedPPE = [];
 
-    if (!detections || detections.length === 0) {
+    if (!detections || !Array.isArray(detections) || detections.length === 0) {
       return {
         hasViolations: false,
         violations: [],
@@ -123,13 +53,13 @@ export class PPETracker {
     detections.forEach((detection) => {
       const className = detection.class || "";
 
-      // Check if it's a violation with fuzzy matching
-      if (this.isViolationClass(className)) {
+      // Check if it's a violation
+      if (this.violationClasses.includes(className)) {
         detectedViolations.push(className);
       }
 
       // Check if it's proper PPE
-      if (this.isProperPPEClass(className)) {
+      if (this.properPPEClasses.includes(className)) {
         detectedPPE.push(className);
       }
     });
@@ -163,7 +93,7 @@ export class PPETracker {
    * @param {Array} detections - Detection results
    * @param {Buffer} imageBuffer - Image buffer
    */
-  async processDetection(sessionId, detections, imageBuffer) {
+  processDetection(sessionId, detections, imageBuffer) {
     const violationCheck = this.checkViolations(detections);
 
     if (violationCheck.hasViolations) {
@@ -182,43 +112,19 @@ export class PPETracker {
 
       // Store violation in database (PDF will be generated every 15 minutes)
       try {
-        const result = await this.violationStorage.storeViolation(
+        this.violationStorage.storeViolation(
           detections,
           imageBuffer,
           "Live Detection"
         );
         console.log(
-          `📋 Violation stored for session ${sessionId} - PDF will be generated`
+          `📋 Violation stored for session ${sessionId} - PDF will be generated every 15 minutes`
         );
-        console.log(`📊 Storage result:`, result);
 
-        // Try to generate PDF immediately if there's a pending flag
-        if (result && result.pendingPDFGeneration) {
-          console.log(
-            `🚀 Triggering immediate PDF generation for ${result.personId}`
-          );
-          // Use setImmediate to avoid blocking
-          setImmediate(async () => {
-            try {
-              const generated =
-                await this.violationStorage.generatePendingPDFs();
-              if (generated && generated.length > 0) {
-                console.log(
-                  `✅ Successfully generated ${generated.length} PDF(s)`
-                );
-                generated.forEach((path) => console.log(`   - ${path}`));
-              } else {
-                console.log(`⚠️ No PDFs were generated`);
-              }
-            } catch (error) {
-              console.error("Error generating PDF immediately:", error);
-            }
-          });
-        } else {
-          console.log(
-            `⚠️ PDF generation NOT triggered - pendingPDFGeneration: ${result?.pendingPDFGeneration}`
-          );
-        }
+        // Generate PDF immediately for live detection
+        console.log(`📄 Generating PDF report for live detection violations`);
+        this.violationStorage.generatePendingPDFs();
+        console.log(`✅ PDF report generated for live detection`);
       } catch (error) {
         console.error("Error storing violation:", error);
       }
@@ -315,11 +221,6 @@ export class PPETracker {
 
     console.log(`📧 Preparing to send email alert for session ${sessionId}`);
     console.log(`   Violations: ${violations.join(", ")}`);
-    console.log(
-      `   ImageBuffer: ${
-        imageBuffer ? `Yes (${imageBuffer.length} bytes)` : "NO IMAGE"
-      }`
-    );
 
     try {
       const result = await this.emailService.sendViolationAlert({
